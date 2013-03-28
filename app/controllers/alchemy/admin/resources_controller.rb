@@ -16,10 +16,12 @@ module Alchemy
       end
 
       def index
+        items = resource_handler.model
+        if contains_relations?
+          items = items.includes(*resource_relations_names)
+        end
         if params[:query].present?
-          items = queried_items
-        else
-          items = resource_handler.model
+          items = query_items(items)
         end
         items = items.page(params[:page] || 1).per(per_page_value_for_screen_size).order(sort_order)
         instance_variable_set("@#{resource_handler.resources_name}", items)
@@ -97,31 +99,41 @@ module Alchemy
 
       # Returns a sort order for AR#sort method
       #
-      # Falls back to id, if the requested column is not a column of model.
-      # Used by handles_sortable_columns
+      # Falls back to fallback_sort_order, if the requested column is not a column of model.
+      #
+      # If the column is a tablename and column combination that matches any resource relations, than this order will be taken.
       #
       def sort_order
         sortable_column_order do |column, direction|
-          if resource_handler.model.column_names.include?(column.to_s)
+          if resource_handler.model_associations.present? && column.match(/\./)
+            table, column = column.split('.')
+            if resource_handler.model_associations.detect { |a| a.table_name == table }
+              "`#{table}`.`#{column}` #{direction}"
+            else
+              fallback_sort_order(direction)
+            end
+          elsif resource_handler.model.column_names.include?(column.to_s)
             "`#{resource_handler.model.table_name}`.`#{column}` #{direction}"
           else
-            "`#{resource_handler.model.table_name}`.`id` #{direction}"
+            fallback_sort_order(direction)
           end
         end
       end
 
+      # Default sort order fallback
+      #
+      # Overwrite this in your controller to define custom fallback
+      #
+      def fallback_sort_order(direction)
+        "`#{resource_handler.model.table_name}`.`id` #{direction}"
+      end
+
       # Returns an activerecord object that contains items matching params[:query]
       #
-      # If the model contains model relations, all associations tables get queried as well.
-      #
-      def queried_items
+      def query_items(items)
         query = params[:query].downcase.split(' ').join('%')
         query = ActiveRecord::Base.sanitize("%#{query}%")
-        items = resource_handler.model.where(search_query(query))
-        if contains_searchable_relations?
-          items = items.includes(*resource_relations_names)
-        end
-        items
+        items.where(search_query(query))
       end
 
       # Returns a search query string

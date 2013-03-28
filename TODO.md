@@ -7,5 +7,3 @@
 * Do not show not visible pages in breadcrumb helper
 * horizontal scrollable resources table
 * Fix Tag#edit view
-* resource relations:
-  * sortable table header should sort by related model attribute

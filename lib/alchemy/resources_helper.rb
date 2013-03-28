@@ -78,14 +78,26 @@ module Alchemy
       content_tag :h1, "#{resources_instance_variable.total_count} #{resource_model.model_name.human(:count => resources_instance_variable.total_count)}"
     end
 
-    # Returns true if the searchable_attributes contains relations
-    def contains_searchable_relations?
-      resource_handler.searchable_attributes.detect { |a| a[:relation] }.present?
+    # Returns true if the resource contains any relations
+    def contains_relations?
+      resource_handler.resource_relations.present?
     end
 
     # Returns an array of all resource_relations names
     def resource_relations_names
       resource_handler.resource_relations.collect { |k, v| v[:name].to_sym }
+    end
+
+    # Returns the attribute's column for sorting
+    #
+    # If the attribute contains a resource_relation, then the table and column for related model will be returned.
+    #
+    def sortable_resource_header_column(attribute)
+      if relation = attribute[:relation]
+        "#{relation[:model_association].table_name}.#{relation[:attr_method]}"
+      else
+        attribute[:name]
+      end
     end
 
   end
